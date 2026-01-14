@@ -45,6 +45,8 @@ EndFunc
 
 ; Skill ID: 156 - $GC_I_SKILL_ID_VAMPIRIC_TOUCH
 Func CanUse_VampiricTouch()
+	; Only use if there's an enemy in touch range
+	If UAI_CountAgents(-2, $GC_I_RANGE_ADJACENT, "UAI_Filter_IsLivingEnemy") < 1 Then Return False
 	Return True
 EndFunc
 
@@ -53,7 +55,7 @@ Func BestTarget_VampiricTouch($a_f_AggroRange)
 	; Skill. Touch target foe to steal up to 29...65...74 Health.
 	; Concise description
 	; Touch Skill. Steals 29...65...74 Health.
-	Return 0
+	Return UAI_GetAgentLowest(-2, $a_f_AggroRange, $GC_UAI_AGENT_HP, "UAI_Filter_IsLivingEnemy")
 EndFunc
 
 ; Skill ID: 158 - $GC_I_SKILL_ID_TOUCH_OF_AGONY
@@ -175,7 +177,22 @@ EndFunc
 
 ; Skill ID: 436 - $GC_I_SKILL_ID_COMFORT_ANIMAL
 Func CanUse_ComfortAnimal()
-	Return True
+    Local $l_i_PetSize = World_GetWorldInfo("PetInfoArraySize")
+    Local $lMyPet = 0
+
+    ; PetNumber starts at 1, not 0
+    For $i = 1 To $l_i_PetSize
+        If Party_GetPetInfo($i, "OwnerAgentID") = Agent_GetMyID() Then
+            $lMyPet = Party_GetPetInfo($i, "AgentID")
+            ExitLoop
+        EndIf
+    Next
+
+    If $lMyPet = 0 Then Return False
+
+    If Agent_GetAgentInfo($lMyPet, "HPPercent") < 0.5 Then Return True
+
+    Return False
 EndFunc
 
 Func BestTarget_ComfortAnimal($a_f_AggroRange)
@@ -188,6 +205,8 @@ EndFunc
 
 ; Skill ID: 446 - $GC_I_SKILL_ID_TROLL_UNGUENT
 Func CanUse_TrollUnguent()
+	; Only use if HP is below 80%
+	If UAI_GetPlayerInfo($GC_UAI_AGENT_HP) > 0.8 Then Return False
 	Return True
 EndFunc
 

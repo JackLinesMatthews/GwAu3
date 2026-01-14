@@ -25,19 +25,19 @@ Global $g_iPathfinder_StuckDistance = 50            ; If moved less than this, c
 ; $aFightRangeOut = Range out for fighting
 ; $aFinisherMode = Finisher mode for UAI_Fight
 ; Returns: True if destination reached, False if interrupted
-Func Pathfinder_MoveTo($aDestX, $aDestY, $aObstacles = 0, $aAggroRange = 1320, $aFightRangeOut = 3500, $aFinisherMode = 0)
+Func Pathfinder_MoveTo($aDestX, $aDestY, $aObstacles = 0, $aAggroRange = 1320, $aFightRangeOut = 3500, $aFinisherMode = 0, $aCallFunc = "")
 	If Agent_GetAgentInfo(-2, "IsDead") Then Return
     Local $lMyOldMap = Map_GetMapID()
     Local $lMapLoadingOld = Map_GetInstanceInfo("Type")
     Local $lMyX = Agent_GetAgentInfo(-2, "X")
     Local $lMyY = Agent_GetAgentInfo(-2, "Y")
-	Local $lLayer = 0
+	Local $lLayer = Agent_GetAgentInfo(-2, "Plane")
 
 	; Map was not full loaded
-	If $lMyX = 0 Or $lMyY = 0 Or $lMyOldMap = 0 Or $lMapLoadingOld = $GC_I_MAP_TYPE_LOADING Then
+	If $lMyX = 0 Or $lMyY = 0 Or $lMyOldMap = 0 Or $lMapLoadingOld = $GC_I_MAP_TYPE_LOADING Or Other_GetPing() = 0 Then
 		Do
 			Sleep(16)
-		Until Map_GetMapID() <> 0 And (Agent_GetAgentInfo(-2, "X") <> 0 Or Agent_GetAgentInfo(-2, "Y") <> 0)
+		Until Map_GetMapID() <> 0 And (Agent_GetAgentInfo(-2, "X") <> 0 Or Agent_GetAgentInfo(-2, "Y") <> 0) And Other_GetPing() <> 0
 
 		$lMyX = Agent_GetAgentInfo(-2, "X")
 		$lMyY = Agent_GetAgentInfo(-2, "Y")
@@ -49,7 +49,7 @@ Func Pathfinder_MoveTo($aDestX, $aDestY, $aObstacles = 0, $aAggroRange = 1320, $
     If $g_hPathfinderDLL = 0 Or $g_hPathfinderDLL = -1 Then
         If Not Pathfinder_Initialize() Then
             ; Fallback to direct movement if DLL fails
-            Map_Move($aDestX, $aDestY, $lLayer)
+            Map_MoveLayer($aDestX, $aDestY, $lLayer)
             Return False
         EndIf
     EndIf
@@ -70,10 +70,12 @@ Func Pathfinder_MoveTo($aDestX, $aDestY, $aObstacles = 0, $aAggroRange = 1320, $
         $lCurrentObstacles = $aObstacles
     EndIf
 
-    Local $lPath = _Pathfinder_GetPath($lMyX, $lMyY, $aDestX, $aDestY, $lCurrentObstacles)
+    Local $lPath = _Pathfinder_GetPath($lMyX, $lMyY, $lLayer, $aDestX, $aDestY, $lCurrentObstacles)
     If Not IsArray($lPath) Or UBound($lPath) = 0 Then
+        ; Path calculation failed - use empty path and rely on direct movement
+        Local $lEmptyPath[0][3]
+        $lPath = $lEmptyPath
         Map_MoveLayer($aDestX, $aDestY, $lLayer)
-;~         Return
     EndIf
 
     ; Initialize path tracking
@@ -90,7 +92,7 @@ Func Pathfinder_MoveTo($aDestX, $aDestY, $aObstacles = 0, $aAggroRange = 1320, $
     ; Main movement loop
     Do
         ; Check for map change
-        If Map_GetMapID() <> $lMyOldMap Or Map_GetInstanceInfo("Type") <> $lMapLoadingOld Then
+        If (Map_GetMapID() <> $lMyOldMap And Not Game_GetGameInfo("IsCinematic")) Or Map_GetInstanceInfo("Type") <> $lMapLoadingOld Then
             Pathfinder_Shutdown()
             Return True
         EndIf
@@ -98,6 +100,7 @@ Func Pathfinder_MoveTo($aDestX, $aDestY, $aObstacles = 0, $aAggroRange = 1320, $
 		; Need to return to outpost
         If Party_GetPartyContextInfo("IsDefeated") Then
             Pathfinder_Shutdown()
+			Map_ReturnToOutpost()
             Return False
         EndIf
 
@@ -128,7 +131,7 @@ Func Pathfinder_MoveTo($aDestX, $aDestY, $aObstacles = 0, $aAggroRange = 1320, $
                 $lNeedPathUpdate = True
                 If $lStuckCount >= 3 Then
                     Local $lRandomAngle = Random(0, 6.28)
-                    Map_Move($lMyX + Cos($lRandomAngle) * 200, $lMyY + Sin($lRandomAngle) * 200, 0)
+                    Map_MoveLayer($lMyX + Cos($lRandomAngle) * 200, $lMyY + Sin($lRandomAngle) * 200, $lLayer)
                     Sleep(500)
                     $lStuckCount = 0
                 EndIf
@@ -142,7 +145,7 @@ Func Pathfinder_MoveTo($aDestX, $aDestY, $aObstacles = 0, $aAggroRange = 1320, $
 
         ; Recalculate path at every interval (always from current position)
         If TimerDiff($g_hPathfinder_LastPathUpdateTime) > $g_iPathfinder_PathUpdateInterval Or $lNeedPathUpdate Then
-            $lPath = _Pathfinder_GetPath($lMyX, $lMyY, $aDestX, $aDestY, $lCurrentObstacles)
+            $lPath = _Pathfinder_GetPath($lMyX, $lMyY, $lLayer, $aDestX, $aDestY, $lCurrentObstacles)
             If IsArray($lPath) And UBound($lPath) > 0 Then
                 $g_aPathfinder_CurrentPath = $lPath
                 $g_iPathfinder_CurrentPathIndex = 0
@@ -200,10 +203,26 @@ Func Pathfinder_MoveTo($aDestX, $aDestY, $aObstacles = 0, $aAggroRange = 1320, $
             EndIf
 		EndIf
 
+		Sleep(32)
 
-        Sleep(64)
+		If $aCallFunc <> "" Then Call($aCallFunc)
 
-    Until Agent_GetDistanceToXY($aDestX, $aDestY) < 250
+		If Game_GetGameInfo("IsCinematic") Then
+			Local $lWaitTimer = TimerInit()
+			Do
+				Sleep(250)
+				Cinematic_SkipCinematic()
+			Until Not Game_GetGameInfo("IsCinematic") Or TimerDiff($lWaitTimer) > 120000
+			Sleep(250)
+			Local $lWaitPing = TimerInit()
+			If Other_GetPing() = 0 Then
+				Do
+					Sleep(64)
+				Until Other_GetPing() <> 0 Or TimerDiff($lWaitPing) > 30000
+			EndIf
+		EndIf
+
+    Until Agent_GetDistanceToXY($aDestX, $aDestY) < 125
 
     ; Shutdown DLL and free memory
     Pathfinder_Shutdown()
@@ -212,51 +231,35 @@ Func Pathfinder_MoveTo($aDestX, $aDestY, $aObstacles = 0, $aAggroRange = 1320, $
 EndFunc
 
 ; Internal: Get path from current position to destination
-Func _Pathfinder_GetPath($aStartX, $aStartY, $aDestX, $aDestY, $aObstacles)
+Func _Pathfinder_GetPath($aStartX, $aStartY, $aStartLayer, $aDestX, $aDestY, $aObstacles)
     Local $lMapID = Map_GetMapID()
     Local $lObstacleCount = 0
     If IsArray($aObstacles) Then $lObstacleCount = UBound($aObstacles)
 
-    _Pathfinder_Log("GetPath: Map=" & $lMapID & " Start=(" & Round($aStartX, 1) & ", " & Round($aStartY, 1) & ") Dest=(" & Round($aDestX, 1) & ", " & Round($aDestY, 1) & ") Obstacles=" & $lObstacleCount)
+    _Pathfinder_Log("GetPath: Map=" & $lMapID & " Start=(" & Round($aStartX, 1) & ", " & Round($aStartY, 1) & ") Layer=" & $aStartLayer & " Dest=(" & Round($aDestX, 1) & ", " & Round($aDestY, 1) & ") Obstacles=" & $lObstacleCount)
 
-    If IsArray($aObstacles) And UBound($aObstacles) > 0 Then
-        ; Get raw path with minimal simplification from DLL
-        Local $lPath = Pathfinder_FindPathGWWithObstacle($lMapID, $aStartX, $aStartY, $aDestX, $aDestY, $aObstacles, 100)
-        Local $lError = @error
-        Local $lExtended = @extended
+    ; Get raw path with minimal simplification from DLL
+    Local $lPath = Pathfinder_FindPath($lMapID, $aStartX, $aStartY, $aStartLayer, $aDestX, $aDestY, $aObstacles, 100)
+    Local $lError = @error
+    Local $lExtended = @extended
 
-        If $lError Then
-            _Pathfinder_Log("ERROR: FindPathGWWithObstacle failed - @error=" & $lError & " @extended=" & $lExtended)
-            Return 0
-        EndIf
-
-        If Not IsArray($lPath) Then
-            _Pathfinder_Log("ERROR: FindPathGWWithObstacle returned non-array")
-            Return 0
-        EndIf
-
-		$lPath = _Pathfinder_SmartSimplify($lPath, $aObstacles, $g_iPathfinder_SimplifyRange)
-
-        _Pathfinder_Log("SUCCESS: Path found with " & UBound($lPath) & " points")
-        Return $lPath
-    Else
-        Local $lPath = Pathfinder_FindPathGW($lMapID, $aStartX, $aStartY, $aDestX, $aDestY, 500)
-        Local $lError = @error
-        Local $lExtended = @extended
-
-        If $lError Then
-            _Pathfinder_Log("ERROR: FindPathGW failed - @error=" & $lError & " @extended=" & $lExtended)
-            Return 0
-        EndIf
-
-        If Not IsArray($lPath) Then
-            _Pathfinder_Log("ERROR: FindPathGW returned non-array")
-            Return 0
-        EndIf
-
-        _Pathfinder_Log("SUCCESS: Path found with " & UBound($lPath) & " points")
-        Return $lPath
+    If $lError Then
+        _Pathfinder_Log("ERROR: FindPathGWWithObstacle failed - @error=" & $lError & " @extended=" & $lExtended)
+        Return 0
     EndIf
+
+    If Not IsArray($lPath) Then
+        _Pathfinder_Log("ERROR: FindPathGWWithObstacle returned non-array")
+        Return 0
+    EndIf
+
+    ; Apply smart simplification if obstacles are provided
+    If IsArray($aObstacles) And UBound($aObstacles) > 0 Then
+        $lPath = _Pathfinder_SmartSimplify($lPath, $aObstacles, $g_iPathfinder_SimplifyRange)
+    EndIf
+
+    _Pathfinder_Log("SUCCESS: Path found with " & UBound($lPath) & " points")
+    Return $lPath
 EndFunc
 
 ; Smart path simplification that preserves waypoints near obstacles and layer changes
@@ -264,8 +267,12 @@ EndFunc
 ; $aObstacles = 2D array of obstacles [[x, y, radius], ...]
 ; $aSimplifyRange = distance threshold for simplification
 Func _Pathfinder_SmartSimplify($aPath, $aObstacles, $aSimplifyRange)
+    ; Validate input
+    If Not IsArray($aPath) Then Return $aPath
     Local $lPointCount = UBound($aPath)
     If $lPointCount <= 2 Then Return $aPath
+    ; Validate 2D array with at least 3 columns
+    If UBound($aPath, 0) <> 2 Or UBound($aPath, 2) < 3 Then Return $aPath
 
     ; Mark which points are critical (near obstacles or layer changes)
     Local $lCritical[$lPointCount]
@@ -490,10 +497,12 @@ Func _Pathfinder_ShouldWaitForParty($fMaxDistance = 1800, $fResumeDistance = 140
 
     ; Get the "Flag All" position (if set, heroes following flag are excluded)
     Local $aFlagAll = World_GetWorldInfo("FlagAll")
-	Local $fX = $aFlagAll[0]
-	Local $fY = $aFlagAll[1]
-	; Check if values are finite and not zero (meaning flag is actually placed)
-	If _IsFinite($fX) And _IsFinite($fY) Then Return False
+	If IsArray($aFlagAll) Then
+		Local $fX = $aFlagAll[0]
+		Local $fY = $aFlagAll[1]
+		; Check if values are finite and not zero (meaning flag is actually placed)
+		If _IsFinite($fX) And _IsFinite($fY) Then Return True
+	EndIf
 
     ; Get party size (players + heroes + henchmen)
     Local $iPartySize = Party_GetPartyContextInfo("TotalPartySize")
@@ -531,12 +540,12 @@ Func _Pathfinder_PartyWithinRange($fResumeDistance = 1400)
 
     ; Get the "Flag All" position
     Local $aFlagAll = World_GetWorldInfo("FlagAll")
-If IsArray($aFlagAll) Then
-	Local $fX = $aFlagAll[0]
-	Local $fY = $aFlagAll[1]
-	; Check if values are finite and not zero (meaning flag is actually placed)
-	If _IsFinite($fX) And _IsFinite($fY) Then Return True
-EndIf
+	If IsArray($aFlagAll) Then
+		Local $fX = $aFlagAll[0]
+		Local $fY = $aFlagAll[1]
+		; Check if values are finite and not zero (meaning flag is actually placed)
+		If _IsFinite($fX) And _IsFinite($fY) Then Return True
+	EndIf
 
     ; Get party size and count nearby members
     Local $iPartySize = Party_GetPartyContextInfo("TotalPartySize")

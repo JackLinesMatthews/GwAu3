@@ -158,6 +158,7 @@ EndFunc
 ; Skill ID: 330 - $GC_I_SKILL_ID_CYCLONE_AXE
 Func CanUse_CycloneAxe()
 	If Anti_Attack() Then Return False
+	If UAI_CountAgents($g_i_BestTarget, $GC_I_RANGE_ADJACENT, "UAI_Filter_IsLivingEnemy") < 2 Then Return False
 	Return True
 EndFunc
 
@@ -166,7 +167,7 @@ Func BestTarget_CycloneAxe($a_f_AggroRange)
 	; Axe Attack. Perform a spinning axe attack striking for +4...10...12 damage to all adjacent opponents.
 	; Concise description
 	; Axe Attack. Deals +4...10...12 damage to all foes adjacent to you.
-	Return 0
+	Return UAI_GetNearestAgent(-2, $GC_I_RANGE_ADJACENT, "UAI_Filter_IsLivingEnemy")
 EndFunc
 
 ; Skill ID: 331 - $GC_I_SKILL_ID_HAMMER_BASH
@@ -180,7 +181,7 @@ Func BestTarget_HammerBash($a_f_AggroRange)
 	; Hammer Attack. Lose all adrenaline. If Hammer Bash hits, your target is knocked down.
 	; Concise description
 	; Hammer Attack. Causes knock-down. Lose all adrenaline.
-	Return 0
+	Return UAI_GetNearestAgent(-2, $a_f_AggroRange, "UAI_Filter_IsLivingEnemy")
 EndFunc
 
 ; Skill ID: 332 - $GC_I_SKILL_ID_BULLS_STRIKE
@@ -228,7 +229,11 @@ Func CanUse_ExecutionersStrike()
 EndFunc
 
 Func BestTarget_ExecutionersStrike($a_f_AggroRange)
-	Return 0
+	; Description
+	; Axe Attack. If this attack hits, you strike for +10...34...40 damage.
+	; Concise description
+	; Axe Attack. Deals +10...34...40 damage.
+	Return UAI_GetNearestAgent(-2, $a_f_AggroRange, "UAI_Filter_IsLivingEnemy")
 EndFunc
 
 ; Skill ID: 337 - $GC_I_SKILL_ID_DISMEMBER
@@ -480,7 +485,7 @@ Func BestTarget_SeverArtery($a_f_AggroRange)
 	; Sword Attack. If this attack hits, the opponent begins Bleeding for 5...21...25 seconds, losing Health over time.
 	; Concise description
 	; Sword Attack. Inflicts Bleeding condition (5...21...25 seconds).
-	Return 0
+	Return UAI_GetNearestAgent(-2, $a_f_AggroRange, "UAI_Filter_IsLivingEnemy")
 EndFunc
 
 ; Skill ID: 383 - $GC_I_SKILL_ID_GALRATH_SLASH
@@ -508,7 +513,7 @@ Func BestTarget_Gash($a_f_AggroRange)
 	; Sword Attack. If this attack hits a Bleeding foe, you strike for 5...17...20 more damage and that foe suffers a Deep Wound, lowering that foe's maximum Health by 20% for 5...17...20 seconds.
 	; Concise description
 	; Sword Attack. Deals +5...17...20 damage and inflicts Deep Wound condition (5...17...20 seconds) if your target is Bleeding.
-	Return 0
+	Return UAI_GetNearestAgent(-2, $a_f_AggroRange, "UAI_Filter_IsLivingEnemy|UAI_Filter_IsBleeding")
 EndFunc
 
 ; Skill ID: 385 - $GC_I_SKILL_ID_FINAL_THRUST
@@ -602,7 +607,7 @@ Func BestTarget_PowerShot($a_f_AggroRange)
 	; Bow Attack. If Power Shot hits, target foe takes 25...45...50 damage.
 	; Concise description
 	; Bow Attack. Target foe takes 25...45...50 damage.
-	Return 0
+	Return UAI_GetAgentLowest(-2, $a_f_AggroRange, $GC_UAI_AGENT_HP, "UAI_Filter_IsLivingEnemy")
 EndFunc
 
 ; Skill ID: 395 - $GC_I_SKILL_ID_BARRAGE
@@ -630,7 +635,7 @@ Func BestTarget_DualShot($a_f_AggroRange)
 	; Bow Attack. Shoot two arrows simultaneously at target foe. These arrows deal 25% less damage.
 	; Concise description
 	; Bow Attack. You shoot two arrows simultaneously at target foe. These arrows deal 25% less damage
-	Return 0
+	Return UAI_GetAgentLowest(-2, $a_f_AggroRange, $GC_UAI_AGENT_HP, "UAI_Filter_IsLivingEnemy")
 EndFunc
 
 ; Skill ID: 397 - $GC_I_SKILL_ID_QUICK_SHOT
@@ -672,7 +677,7 @@ Func BestTarget_DistractingShot($a_f_AggroRange)
 	; Bow Attack. If Distracting Shot hits, it interrupts target foe's action but deals only 1...13...16 damage. If the interrupted action was a skill, that skill is disabled for an additional 20 seconds.
 	; Concise description
 	; Bow Attack. Interrupts an action. Interruption effect: interrupted skill is disabled for +20 seconds. Hits for only 1...13...16 damage.
-	Return 0
+	Return UAI_GetNearestAgent(-2, 1320, "UAI_Filter_IsLivingEnemy")
 EndFunc
 
 ; Skill ID: 400 - $GC_I_SKILL_ID_PRECISION_SHOT
@@ -763,6 +768,8 @@ EndFunc
 ; Skill ID: 407 - $GC_I_SKILL_ID_POINT_BLANK_SHOT
 Func CanUse_PointBlankShot()
 	If Anti_Attack() Then Return False
+	; Only use if there's a close range enemy (half bow range ~660)
+	If UAI_CountAgents($g_i_BestTarget, $GC_I_RANGE_NEARBY, "UAI_Filter_IsLivingEnemy") < 1 Then Return False
 	Return True
 EndFunc
 
@@ -771,7 +778,7 @@ Func BestTarget_PointBlankShot($a_f_AggroRange)
 	; Bow Attack. Shoot an arrow that has half the normal range, but strikes for +10...34...40 damage.
 	; Concise description
 	; Half Range Bow Attack. Deals +10...34...40 damage.
-	Return 0
+	Return UAI_GetAgentLowest(-2, $a_f_AggroRange, $GC_UAI_AGENT_HP, "UAI_Filter_IsLivingEnemy")
 EndFunc
 
 ; Skill ID: 408 - $GC_I_SKILL_ID_CONCUSSION_SHOT
@@ -813,7 +820,7 @@ Func BestTarget_SavageShot($a_f_AggroRange)
 	; Bow Attack. If Savage Shot hits, your target's action is interrupted. If that action was a spell, you strike for +13...25...28 damage.
 	; Concise description
 	; Bow Attack. Interrupts an action. Interruption effect: deals +13...25...28 damage if action was a spell.
-	Return 0
+	Return UAI_GetNearestAgent(-2, 1320, "UAI_Filter_IsLivingEnemy")
 EndFunc
 
 ; Skill ID: 428 - $GC_I_SKILL_ID_INCENDIARY_ARROWS
@@ -1992,7 +1999,6 @@ Func CanUse_EremitesAttack()
 EndFunc
 
 Func BestTarget_EremitesAttack($a_f_AggroRange)
-
 	Return UAI_GetBestAOETarget(-2, $GC_I_RANGE_ADJACENT, "UAI_Filter_IsLivingEnemy")
 EndFunc
 
@@ -2810,7 +2816,7 @@ Func CanUse_SlothHuntersShot()
 EndFunc
 
 Func BestTarget_SlothHuntersShot($a_f_AggroRange)
-	Return 0
+	Return UAI_GetNearestAgent(-2, 1320, "UAI_Filter_IsLivingEnemy")
 EndFunc
 
 ; Skill ID: 2070 - $GC_I_SKILL_ID_AURA_SLICER
@@ -2980,7 +2986,7 @@ Func BestTarget_Volley($a_f_AggroRange)
 	; Bow Attack. All your Preparations are removed. Shoot arrows at target foe and up to 3 foes adjacent to your target. These arrows strike for +1...8...10 damage if they hit.
 	; Concise description
 	; Bow Attack. Deals +1...8...10 damage. Hits up to 3 foes adjacent to your target. All your preparations are removed.
-	Return 0
+	Return UAI_GetBestAOETarget(-2, $a_f_AggroRange, $GC_I_RANGE_ADJACENT, "UAI_Filter_IsLivingEnemy")
 EndFunc
 
 ; Skill ID: 2147 - $GC_I_SKILL_ID_CRIPPLING_VICTORY
