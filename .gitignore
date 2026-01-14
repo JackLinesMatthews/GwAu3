@@ -8,3 +8,7 @@
 !/Scripts/Tools/
 !/Scripts/Multi-Launcher/
 API/Pathfinding/maps.zip
+API/Core/config.ini
+/API/Pathfinding/maps
+API/Pathfinding/maps_old.zip
+API/Core/config.ini
