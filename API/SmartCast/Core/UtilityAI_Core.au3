@@ -12,7 +12,7 @@ Func UAI_Fight($a_f_x, $a_f_y, $a_f_AggroRange = 1320, $a_f_MaxDistanceToXY = 35
 	Do
 		UAI_UseSkills($a_f_x, $a_f_y, $a_f_AggroRange, $a_f_MaxDistanceToXY)
 		Sleep(128)
-	Until UAI_CountAgents(-2, $a_f_AggroRange, "UAI_Filter_IsLivingEnemy") = 0 Or Agent_GetAgentInfo(-2, "IsDead") Or Party_IsWiped() Or Map_GetMapID() <> $l_i_MyOldMap Or Map_GetInstanceInfo("Type") <> $l_i_MapLoadingOld
+	Until UAI_CountEnemyInPartyAggroRange($a_f_AggroRange) = 0 Or Agent_GetAgentInfo(-2, "IsDead") Or Party_IsWiped() Or Map_GetMapID() <> $l_i_MyOldMap Or Map_GetInstanceInfo("Type") <> $l_i_MapLoadingOld
 EndFunc   ;==>UAI_Fight
 
 ;~ Use this function to cast all of your skills or skills of a certain type.
@@ -31,7 +31,7 @@ Func UAI_UseSkills($a_f_x, $a_f_y, $a_f_AggroRange = 1320, $a_f_MaxDistanceToXY 
 
 ;~ 	UPDATE CACHE FIRST
 		UAI_UpdateCache($a_f_AggroRange)
-		If UAI_CountAgents(-2, $a_f_AggroRange, "UAI_Filter_IsLivingEnemy") = 0 Then ExitLoop
+		If UAI_CountEnemyInPartyAggroRange($a_f_AggroRange) = 0 Then ExitLoop
 		If $g_b_CacheWeaponSet Then UAI_ShouldSwitchWeaponSet()
 
 ;~ 	CHECK PARTY
@@ -40,6 +40,21 @@ Func UAI_UseSkills($a_f_x, $a_f_y, $a_f_AggroRange = 1320, $a_f_MaxDistanceToXY 
 		If $g_b_SkillChanged = True Then
 			If Cache_EndFormChangeBuild($l_i_Slot) Then
 				$g_b_SkillChanged = False
+			EndIf
+		EndIf
+
+;~ 	MOVE TOWARD HERO AGGRO TARGET
+		; If no enemy in player's range but heroes have aggro, move toward the enemy
+		Local $l_i_PlayerRangeEnemy = UAI_GetNearestAgent(-2, $a_f_AggroRange, "UAI_Filter_IsLivingEnemy")
+		If $l_i_PlayerRangeEnemy = 0 Then
+			Local $l_i_PartyRangeEnemy = UAI_GetNearestEnemyInPartyRange($a_f_AggroRange)
+			If $l_i_PartyRangeEnemy <> 0 Then
+				; Move toward the enemy that the hero has aggro'd
+				Local $l_f_EnemyX = UAI_GetAgentInfoByID($l_i_PartyRangeEnemy, $GC_UAI_AGENT_X)
+				Local $l_f_EnemyY = UAI_GetAgentInfoByID($l_i_PartyRangeEnemy, $GC_UAI_AGENT_Y)
+				Map_Move($l_f_EnemyX, $l_f_EnemyY, 0)
+				Sleep(500)
+				Return ; Exit and let the next loop iteration handle the rest
 			EndIf
 		EndIf
 

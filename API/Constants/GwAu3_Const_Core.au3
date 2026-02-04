@@ -66,7 +66,7 @@ Global $g_p_DecreaseAttribute = DllStructGetPtr($g_d_DecreaseAttribute)
 Global $g_i_LastAttributeModified = -1
 Global $g_i_LastAttributeValue = -1
 
-;Trade
+;Trader
 Global $g_p_BuyItemBase      ; Pointer to buy item base
 Global $g_i_TraderQuoteID    ; Current trader quote ID
 Global $g_i_TraderCostID     ; Trader cost ID
@@ -90,6 +90,8 @@ Global $g_i_LastTransactionType = -1
 Global $g_i_LastItemID = 0
 Global $g_i_LastQuantity = 0
 Global $g_i_LastPrice = 0
+Global $g_p_CraftItem
+Global $g_p_CollectorExchange
 
 ;Agent
 Global $g_p_AgentBase      ; Pointer to agent array
@@ -158,10 +160,14 @@ Global $g_d_LockHeroTarget = DllStructCreate('ptr;dword;dword')
 Global $g_p_LockHeroTarget = DllStructGetPtr($g_d_LockHeroTarget)
 Global $g_d_ToggleHeroSkillState = DllStructCreate('ptr;dword;dword')
 Global $g_p_ToggleHeroSkillState = DllStructGetPtr($g_d_ToggleHeroSkillState)
+Global $g_d_ActiveQuest = DllStructCreate('ptr;dword')
+Global $g_p_ActiveQuest = DllStructGetPtr($g_d_ActiveQuest)
 
-;UI-Msg
+;UIMsg
 Global $g_d_MoveMap = DllStructCreate('ptr;dword;dword;dword;dword;dword')
 Global $g_p_MoveMap = DllStructGetPtr($g_d_MoveMap)
+Global $g_d_EquipItem = DllStructCreate('ptr;dword;dword;dword')
+Global $g_p_EquipItem = DllStructGetPtr($g_d_EquipItem)
 
 ;Party
 Global $g_d_AddPlayer = DllStructCreate('ptr;dword')

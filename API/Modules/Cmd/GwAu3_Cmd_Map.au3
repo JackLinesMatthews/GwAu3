@@ -57,20 +57,20 @@ EndFunc   ;==>EnterChallenge
 ;~ EndFunc   ;==>EnterChallengeForeign
 
 ;~ Description: Travel to your guild hall.
-Func Map_TravelGH()
+Func Map_TravelGH($a_WaitToLoad = True)
     Local $l_ai_Offset[3] = [0, 0x18, 0x3C]
     Local $l_ap_GH = Memory_ReadPtr($g_p_BasePointer, $l_ai_Offset)
 
 	Map_InitMapIsLoaded()
     Core_SendPacket(0x18, $GC_I_HEADER_PARTY_ENTER_GUILD_HALL, Memory_Read($l_ap_GH[1] + 0x64), Memory_Read($l_ap_GH[1] + 0x68), Memory_Read($l_ap_GH[1] + 0x6C), Memory_Read($l_ap_GH[1] + 0x70), 1)
-    Map_WaitMapIsLoaded()
+    If $a_WaitToLoad Then Return Map_WaitMapIsLoaded()
 EndFunc   ;==>TravelGH
 
 ;~ Description: Leave your guild hall.
-Func Map_LeaveGH()
+Func Map_LeaveGH($a_WaitToLoad = True)
 	Map_InitMapIsLoaded()
     Core_SendPacket(0x8, $GC_I_HEADER_PARTY_LEAVE_GUILD_HALL, 1)
-    Map_WaitMapIsLoaded()
+    If $a_WaitToLoad Then Return Map_WaitMapIsLoaded()
 EndFunc   ;==>LeaveGH
 
 ;~ Description: Map travel to an outpost.
@@ -89,7 +89,7 @@ EndFunc   ;==>TravelTo
 ;~ Description: Travel to a map in a random district (different from current)
 ;~ $a_i_MapID = Target map ID
 ;~ $a_i_MaxRegions = Number of regions to use (7=EU only, 8=EU+Int, 11=All excluding America)
-Func Map_RndTravel($a_i_MapID)
+Func Map_RndTravel($a_i_MapID, $a_WaitToLoad = True)
     ; Region/Language order: eu-en, eu-fr, eu-ge, eu-it, eu-sp, eu-po, eu-ru, us-en, int, asia-ko, asia-ch
 	Local $a_i_MaxRegions = 11
     Local $a_i_Region[11]   = [2, 2, 2, 2, 2, 2, 2, -2, 1, 3, 4]
@@ -115,7 +115,7 @@ Func Map_RndTravel($a_i_MapID)
 
     Map_InitMapIsLoaded()
     Map_MoveMap($a_i_MapID, $a_i_Region[$l_i_Random], 0, $a_i_Language[$l_i_Random])
-    Return Map_WaitMapIsLoaded()
+	If $a_WaitToLoad Then Return Map_WaitMapIsLoaded()
 EndFunc   ;==>Map_RndTravel
 
 Func Map_WaitMapLoading($a_i_MapID = -1, $a_i_InstanceType = -1, $a_i_Timeout = 30000)
@@ -167,19 +167,24 @@ Func Map_WaitMapIsLoaded($a_i_Timeout = 30000)
     Until Map_MapIsLoaded() Or $l_b_TimedOut
     If $l_b_TimedOut Then Return False
 
-    Sleep(250)
-
-    $l_h_Timeout = TimerInit()
-    If Game_GetGameInfo("IsCinematic") Then
-        Cinematic_SkipCinematic()
-        Do
-            Sleep(50)
-            $l_b_TimedOut = (TimerDiff($l_h_Timeout) >= $a_i_Timeout)
-        Until Map_MapIsLoaded() Or $l_b_TimedOut
-        If $l_b_TimedOut Then Return False
-    EndIf
-
-    Sleep(250)
+    Sleep(500)
 
     Return True
+EndFunc
+
+Func Map_WaitMapIsLoaded_Ping($a_i_Timeout = 30000)
+    If Memory_Read($g_p_MapIsLoaded) = 1 And Other_GetPing() <> 0 Then
+        Map_InitMapIsLoaded()
+        Return True
+    EndIf
+
+    Local $l_b_TimedOut = False, $l_h_Timeout = TimerInit()
+    Do
+        Sleep(50)
+        $l_b_TimedOut = (TimerDiff($l_h_Timeout) >= $a_i_Timeout)
+    Until (Memory_Read($g_p_MapIsLoaded) = 1 And Other_GetPing() <> 0) Or $l_b_TimedOut
+    
+    Map_InitMapIsLoaded()
+
+    Return Not $l_b_TimedOut
 EndFunc

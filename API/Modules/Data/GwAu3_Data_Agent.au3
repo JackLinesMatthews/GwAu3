@@ -407,9 +407,10 @@ Func Agent_GetAgentInfo($a_i_AgentID = -2, $a_s_Info = "")
     Return 0
 EndFunc
 
-Func Agent_GetAgentEquimentInfo($a_i_AgentID = -2, $a_s_Info = "")
-	Local $l_p_AgentPtr = Agent_GetAgentInfo($a_i_AgentID, "Equipment")
+Func Agent_GetAgentEquipmentInfo($a_i_AgentID = -2, $a_s_Info = "")
+	Local $l_p_AgentPtr = Memory_Read(Agent_GetAgentInfo($a_i_AgentID, "Equipment"))
     If $l_p_AgentPtr = 0 Or $a_s_Info = "" Then Return 0
+
     Switch $a_s_Info
         Case "vtable"
             Return Memory_Read($l_p_AgentPtr, "dword")
@@ -633,7 +634,7 @@ Func Agent_GetAgentsAsObstacles($a_f_Range = 2500, $a_f_Radius = 150, $a_s_Filte
     Local $l_f_RefY = Agent_GetAgentInfo($a_i_RefAgentID, "Y")
     Local $l_f_RangeSquared = $a_f_Range * $a_f_Range
 
-    Local $l_a_AgentArray = Agent_GetAgentArray(0xDB) ; 0xDB = Living type
+    Local $l_a_AgentArray = Agent_GetAgentArray() ; 0xDB = Living type
     If Not IsArray($l_a_AgentArray) Or $l_a_AgentArray[0] = 0 Then
         Local $l_a_Empty[0][3]
         Return $l_a_Empty
@@ -647,11 +648,8 @@ Func Agent_GetAgentsAsObstacles($a_f_Range = 2500, $a_f_Radius = 150, $a_s_Filte
         Local $l_p_AgentPtr = $l_a_AgentArray[$i]
         If $l_p_AgentPtr = 0 Then ContinueLoop
 
-        ; Get agent ID for filter
-        Local $l_i_AgentID = Agent_GetAgentInfo($l_p_AgentPtr, "ID")
-
         ; Apply filter(s)
-        If $a_s_Filter <> "" And Not _ApplyFilters($l_i_AgentID, $a_s_Filter) Then ContinueLoop
+        If $a_s_Filter <> "" And Not _ApplyFilters($l_p_AgentPtr, $a_s_Filter) Then ContinueLoop
 
         ; Get position
         Local $l_f_X = Agent_GetAgentInfo($l_p_AgentPtr, "X")
@@ -873,19 +871,19 @@ EndFunc
 
 #Region Related Player Info
 Func Agent_GetPlayerInfo($a_i_AgentID = 0, $a_s_Info = "")
-    Local $l_p_Pointer = World_GetWorldInfo("PlayerArray")
-    Local $l_i_Size = World_GetWorldInfo("PlayerArraySize")
-    Local $l_p_AgentPtr = 0
+    Local $l_p_PlayerArray = World_GetWorldInfo("PlayerArray")
+    Local $l_i_PlayerArraySize = World_GetWorldInfo("PlayerArraySize")
+    Local $l_b_FoundAgent = False
 
-    For $i = 1 To $l_i_Size - 1
-        Local $l_p_AgentEffects = $l_p_Pointer + ($i * 0x50)
-        If Memory_Read($l_p_AgentEffects, "dword") = Agent_ConvertID($a_i_AgentID) Then
-            $l_p_AgentPtr = $l_p_AgentEffects
+    For $i = 1 To $l_i_PlayerArraySize - 1
+        Local $l_p_AgentPtr = $l_p_PlayerArray + ($i * 0x50)
+        If Memory_Read($l_p_AgentPtr, "dword") = Agent_ConvertID($a_i_AgentID) Then
+            $l_b_FoundAgent = True
             ExitLoop
         EndIf
     Next
 
-    If $l_p_AgentPtr = 0 Then Return 0
+    If Not $l_b_FoundAgent Then Return 0
 
     Switch $a_s_Info
         Case "AgentID"
@@ -905,8 +903,16 @@ Func Agent_GetPlayerInfo($a_i_AgentID = 0, $a_s_Info = "")
             Return Memory_Read($l_p_AgentPtr + 0x2C, "dword")
         Case "ActiveTitle"
             Return Memory_Read($l_p_AgentPtr + 0x30, "dword")
+
         Case "ActiveChallenge"
             Return Memory_Read($l_p_AgentPtr + 0x34, "dword")
+        Case "ActiveMelandrusAccord"
+            Return BitAND(Memory_Read($l_p_AgentPtr + 0x34, "dword"), 0x1) <> 0
+        Case "ActiveDhuumsCovenant"
+            Return BitAND(Memory_Read($l_p_AgentPtr + 0x34, "dword"), 0x2) <> 0
+        Case "ActiveReforgedMode"
+            Return BitAND(Memory_Read($l_p_AgentPtr + 0x34, "dword"), 0x4) <> 0
+
         Case "PlayerNumber"
             Return Memory_Read($l_p_AgentPtr + 0x38, "dword")
         Case "PartySize"
@@ -1163,4 +1169,59 @@ Func GetAgents($aAgentID = -2, $aRange = 1320, $aType = 0, $aReturnMode = 0, $aC
         Case 3 ; Closest Distance
             Return $lClosestDistance
     EndSwitch
+EndFunc
+
+; Version of GetAgents that uses X, Y coordinates as reference point instead of an agent
+Func GetAgentsFromXY($aX, $aY, $aRange = 1320, $aType = 0, $aReturnMode = 0, $aCustomFilter = "")
+	Local $lCount = 0
+	Local $lClosestAgent = 0
+	Local $lClosestDistance = 999999
+	Local $lFarthestAgent = 0
+	Local $lFarthestDistance = 0
+
+	Local $lAgentArray
+	If $aType > 0 Then
+		$lAgentArray = Agent_GetAgentArray($aType)
+	Else
+		$lAgentArray = Agent_GetAgentArray()
+	EndIf
+
+	If Not IsArray($lAgentArray) Or $lAgentArray[0] = 0 Then
+		Return 0
+	EndIf
+
+	For $i = 1 To $lAgentArray[0]
+		Local $lAgentPtr = $lAgentArray[$i]
+
+		Local $lAgentX = Agent_GetAgentInfo($lAgentPtr, "X")
+		Local $lAgentY = Agent_GetAgentInfo($lAgentPtr, "Y")
+		Local $lDistance = Sqrt(($lAgentX - $aX) ^ 2 + ($lAgentY - $aY) ^ 2)
+
+		If $lDistance > $aRange Then ContinueLoop
+
+		If $aCustomFilter <> "" And Not _ApplyFilters($lAgentPtr, $aCustomFilter) Then ContinueLoop
+
+		$lCount += 1
+
+		If $lDistance < $lClosestDistance Then
+			$lClosestDistance = $lDistance
+			$lClosestAgent = $lAgentPtr
+		EndIf
+
+		If $lDistance > $lFarthestDistance Then
+			$lFarthestDistance = $lDistance
+			$lFarthestAgent = $lAgentPtr
+		EndIf
+	Next
+
+	Switch $aReturnMode
+		Case 0 ; Number of agents
+			Return $lCount
+		Case 1 ; Closest Agent
+			Return $lClosestAgent
+		Case 2 ; Farthest Agent
+			Return $lFarthestAgent
+		Case 3 ; Closest Distance
+			Return $lClosestDistance
+	EndSwitch
 EndFunc
