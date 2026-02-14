@@ -29,11 +29,15 @@ Global $g_i_QueueCounter
 Global $g_i_QueueSize
 Global $g_p_QueueBase
 Global $g_p_PreGame
+Global $g_p_Login
+Global $g_p_InGame
 Global $g_p_FrameArray
 Global $g_p_AreaInfo
 Global $g_p_StatusCode
 Global $g_p_MapIsLoaded
 Global $g_p_TradePartner
+Global $g_p_SceneContext
+Global $g_p_TimeOnMap
 
 ;Skill
 Global $g_p_SkillBase
@@ -184,4 +188,11 @@ Global $g_p_AcceptInvitation = DllStructGetPtr($g_d_AcceptInvitation)
 ;Bot related
 Global $g_bAutoStart = False  ; Flag for auto-start
 Global $g_s_MainCharName  = ""
+
+;EncString Decoding
+Global $g_p_DecodeInputPtr      ; Pointer to encoded string input buffer in GW memory
+Global $g_p_DecodeOutputPtr     ; Pointer to decoded string output buffer in GW memory
+Global $g_p_DecodeReady         ; Pointer to ready flag in GW memory
+Global $g_d_DecodeEncString = DllStructCreate('ptr;wchar[128]')  ; Command struct: ptr to command + encoded string
+Global $g_p_DecodeEncString = DllStructGetPtr($g_d_DecodeEncString)
 #EndRegion Global Variables

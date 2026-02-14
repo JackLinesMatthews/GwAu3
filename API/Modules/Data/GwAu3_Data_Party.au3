@@ -405,6 +405,13 @@ Func Party_GetHeroInfo($a_i_HeroNumber = 1, $a_s_Info = "")
             Return Memory_Read($l_p_HeroPtr + 0x14, "dword")
         Case "ModelFileID"
             Return Memory_Read($l_p_HeroPtr + 0x18, "dword")
+		Case "Name"
+			Local $lHeroID = Memory_Read($l_p_HeroPtr, "dword")
+			If $lHeroID >= 28 And $lHeroID <= 35 Then
+				Local $l_s_Name = Memory_Read($l_p_HeroPtr + 0x74, "wchar[20]")
+				If $l_s_Name <> "" Then Return $l_s_Name
+			EndIf
+			Return $GC_AM2_HERO_DATA[$lHeroID][1]
     EndSwitch
 
     Return 0

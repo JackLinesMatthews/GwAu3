@@ -1,6 +1,8 @@
 #include-once
 
 Global $g_i_BestTarget = 0
+Global $g_i_ForceTarget = 0
+Global $g_v_AvoidPlayerNumbers = -1
 Global $g_i_LastCalledTarget = 0
 Global $g_as_BestTargetCache[9]
 Global $g_as_CanUseCache[9]

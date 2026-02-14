@@ -1,9 +1,5 @@
 #include-once
 
-#include "Constants/_Constants.au3"
-#include "Core/_Core.au3"
-#include "Modules/_Modules.au3"
-
 If @AutoItX64 Then
     MsgBox(16, "Error!", "Please run all bots in 32-bit (x86) mode.")
     Exit
@@ -53,6 +49,8 @@ Func Core_Initialize($a_s_GW, $a_b_ChangeTitle = True)
     Scanner_AddPattern('BasePointer', '506A0F6A00FF35', 0x8, 'Ptr')
     Scanner_AddPattern('Ping', '568B750889165E', -0x3, 'Ptr')
 	Scanner_AddPattern('StatusCode', '8945088D45086A04', -0x10, 'Ptr')
+	Scanner_AddPattern('Login', '83C420D955ECD955F0', 0x33, 'Ptr')
+	Scanner_AddPattern('InGame', '8D7E388907', 0x30, 'Ptr')
     Scanner_AddPattern('PacketSend', 'C747540000000081E6', -0x4F, 'Func')
     Scanner_AddPattern('PacketLocation', '83C40433C08BE55DC3A1', 0xB, 'Ptr')
 	Scanner_AddPattern('Action', '8B7508578BF983FE09750C6877', -0x3, 'Func')
@@ -60,6 +58,7 @@ Func Core_Initialize($a_s_GW, $a_b_ChangeTitle = True)
 	Scanner_AddPattern('Environment', '6BC67C5E05', 0x6, 'Ptr')
     Scanner_AddPattern('PreGame', "P:\Code\Gw\Ui\UiPregame.cpp", "!s_scene", 'Ptr')
     Scanner_AddPattern('FrameArray', "P:\Code\Engine\Frame\FrMsg.cpp", "frame", 'Ptr')
+	Scanner_AddPattern('SceneContext', 'D9E0D95DFC8B01', 0x0, 'Ptr')
 	; Skill patterns
 	Scanner_AddPattern('SkillBase', '69C6A40000005E', 0x9, 'Ptr') ;/ Scanner_AddPattern('SkillBase', "P:\Code\Gw\Const\ConstSkill.cpp", "index < arrsize(s_skill)", 'Ptr', 0x16) ;or 0x15
     Scanner_AddPattern('SkillTimer', 'FFD68B4DF08BD88B4708', -0x3, 'Ptr')
@@ -119,6 +118,8 @@ Func Core_Initialize($a_s_GW, $a_b_ChangeTitle = True)
 	Scanner_AddPattern('LoadFinished', '2BD9C1E303', 0xA0, 'Hook')
 	Scanner_AddPattern('Trader', '8D4DFC51576A5550', -0x3C, 'Hook')
 	Scanner_AddPattern('TradePartner', '6A008D45F8C745F801000000', -0xC, 'Hook')
+	; EncString Decoding
+	Scanner_AddPattern('ValidateAsyncDecodeStr', "P:\Code\Engine\Text\TextApi.cpp", "codedString", 'Func')
 	If IsDeclared("g_b_AddPattern") Then Extend_AddPattern()
 
     $g_ap_ScanResults = Scanner_ScanAllPatterns()
@@ -129,14 +130,23 @@ Func Core_Initialize($a_s_GW, $a_b_ChangeTitle = True)
     $g_p_PacketLocation = Memory_Read(Scanner_GetScanResult('PacketLocation', $g_ap_ScanResults, 'Ptr'))
     $g_p_Ping = Memory_Read(Scanner_GetScanResult('Ping', $g_ap_ScanResults, 'Ptr'))
 	$g_p_StatusCode = Memory_Read(Scanner_GetScanResult('StatusCode', $g_ap_ScanResults, 'Ptr'))
+	$g_p_Login = Memory_Read(Scanner_GetScanResult('Login', $g_ap_ScanResults, 'Ptr'))
+	$g_p_InGame = Memory_Read(Scanner_GetScanResult('InGame', $g_ap_ScanResults, 'Ptr'))
     $g_p_PreGame = Memory_Read(Scanner_GetScanResult('PreGame', $g_ap_ScanResults, 'Ptr') + 0x35)
     $g_p_FrameArray = Memory_Read(Scanner_GetScanResult('FrameArray', $g_ap_ScanResults, 'Ptr') - 0x13)
+	$g_p_SceneContext = Memory_Read(Scanner_GetScanResult('SceneContext', $g_ap_ScanResults, 'Ptr') + 0x1B)
+	$g_p_TimeOnMap = $g_p_SceneContext + 0xC
+
 	Memory_SetValue('BasePointer', Ptr($g_p_BasePointer))
 	Memory_SetValue('PacketLocation', Ptr($g_p_PacketLocation))
 	Memory_SetValue('Ping', Ptr($g_p_Ping))
 	Memory_SetValue('StatusCode', Ptr($g_p_StatusCode))
+	Memory_SetValue('Login', Ptr($g_p_Login))
+	Memory_SetValue('InGame', Ptr($g_p_InGame))
 	Memory_SetValue('PreGame', Ptr($g_p_PreGame))
 	Memory_SetValue('FrameArray', Ptr($g_p_FrameArray))
+	Memory_SetValue('SceneContext', Ptr($g_p_SceneContext))
+	Memory_SetValue('TimeOnMap', Ptr($g_p_TimeOnMap))
 	Memory_SetValue('PacketSend', Ptr(Scanner_GetScanResult('PacketSend', $g_ap_ScanResults, 'Func')))
     Memory_SetValue('ActionBase', Ptr(Memory_Read(Scanner_GetScanResult('ActionBase', $g_ap_ScanResults, 'Ptr'))))
     Memory_SetValue('Action', Ptr(Scanner_GetScanResult('Action', $g_ap_ScanResults, 'Func')))
@@ -146,8 +156,12 @@ Func Core_Initialize($a_s_GW, $a_b_ChangeTitle = True)
 	Log_Debug("PacketLocation: " & Memory_GetValue('PacketLocation'), "Initialize", $g_h_EditText)
 	Log_Debug("Ping: " & Memory_GetValue('Ping'), "Initialize", $g_h_EditText)
 	Log_Debug("StatusCode: " & Memory_GetValue('StatusCode'), "Initialize", $g_h_EditText)
+	Log_Debug("Login: " & Memory_GetValue('Login'), "Initialize", $g_h_EditText)
+	Log_Debug("InGame: " & Memory_GetValue('InGame'), "Initialize", $g_h_EditText)
 	Log_Debug("PreGame: " & Memory_GetValue('PreGame'), "Initialize", $g_h_EditText)
 	Log_Debug("FrameArray: " & Memory_GetValue('FrameArray'), "Initialize", $g_h_EditText)
+	Log_Debug("SceneContext: " & Memory_GetValue('SceneContext'), "Initialize", $g_h_EditText)
+	Log_Debug("TimeOnMap: " & Memory_GetValue('TimeOnMap'), "Initialize", $g_h_EditText)
 	Log_Debug("PacketSend: " & Memory_GetValue('PacketSend'), "Initialize", $g_h_EditText)
 	Log_Debug("ActionBase: " & Memory_GetValue('ActionBase'), "Initialize", $g_h_EditText)
 	Log_Debug("Action: " & Memory_GetValue('Action'), "Initialize", $g_h_EditText)
@@ -322,6 +336,13 @@ Func Core_Initialize($a_s_GW, $a_b_ChangeTitle = True)
 	Log_Debug("AcceptInvitation: " & Memory_GetValue('AcceptInvitation'), "Initialize", $g_h_EditText)
 	Log_Debug("ActiveQuest: " & Memory_GetValue('ActiveQuest'), "Initialize", $g_h_EditText)
 
+	;EncString Decoding
+	$l_p_Temp = Scanner_GetScanResult('ValidateAsyncDecodeStr', $g_ap_ScanResults, 'Func')
+	$l_p_Temp = Scanner_ToFunctionStart($l_p_Temp)
+	Memory_SetValue('ValidateAsyncDecodeStr', Ptr($l_p_Temp))
+	;EncString log
+	Log_Debug("ValidateAsyncDecodeStr: " & Memory_GetValue('ValidateAsyncDecodeStr'), "Initialize", $g_h_EditText)
+
     ;Hook
     $l_p_Temp = Scanner_GetScanResult('Engine', $g_ap_ScanResults, 'Hook')
     Memory_SetValue('MainStart', Ptr($l_p_Temp))
@@ -367,7 +388,7 @@ Func Core_Initialize($a_s_GW, $a_b_ChangeTitle = True)
     $g_p_QueueBase = Memory_GetValue('QueueBase')
     $g_b_DisableRendering = Memory_GetValue('DisableRendering')
 	$g_p_MapIsLoaded = Memory_GetValue('MapIsLoaded')
-	$g_p_TradePartner = Memory_GetValue('TradePartner')	
+	$g_p_TradePartner = Memory_GetValue('TradePartner')
 	If IsDeclared("g_b_InitializeResult") Then Extend_InitializeResult()
 
     ; Setup command structures
@@ -434,6 +455,11 @@ Func Core_Initialize($a_s_GW, $a_b_ChangeTitle = True)
 	DllStructSetData($g_d_KickInvitedPlayer, 1, Memory_GetValue('CommandKickInvitedPlayer'))
 	DllStructSetData($g_d_RejectInvitation, 1, Memory_GetValue('CommandRejectInvitation'))
 	DllStructSetData($g_d_AcceptInvitation, 1, Memory_GetValue('CommandAcceptInvitation'))
+	;EncString
+	DllStructSetData($g_d_DecodeEncString, 1, Memory_GetValue('CommandDecodeEncString'))
+	$g_p_DecodeInputPtr = Memory_GetValue('DecodeInputPtr')
+	$g_p_DecodeOutputPtr = Memory_GetValue('DecodeOutputPtr')
+	$g_p_DecodeReady = Memory_GetValue('DecodeReady')
 
     If $a_b_ChangeTitle Then WinSetTitle($g_h_GWWindow, '', 'Guild Wars - ' & Player_GetCharname())
 
@@ -553,18 +579,31 @@ Func Core_GetGuildWarsWindow()
     If $l_h_Wnd <> 0 Then Return $l_h_Wnd
 EndFunc
 
+Func Core_GetLoginStatus()
+	Return Memory_Read($g_p_Login, "long")
+EndFunc
+
+Func Core_GetInGameStatus()
+	Return Memory_Read($g_p_InGame, "long")
+EndFunc
+
 Func Core_GetStatusCode()
 	Return Memory_Read($g_p_StatusCode, "long")
 EndFunc
 
-Func Core_GetStatusInGame()
-	$l_i_StatusCode = Core_GetStatusCode()
-	Return $l_i_StatusCode = 0
+Func Core_IsLoginScreen()
+	Local $l_i_Result = (Core_GetLoginStatus() = 1 And Core_GetInGameStatus() = 0)
+	Return $l_i_Result
 EndFunc
 
-Func Core_GetStatusCharacterSelection()
-	$l_i_StatusCode = Core_GetStatusCode()
-	Return $l_i_StatusCode = 1
+Func Core_IsCharacterSelection()
+	Local $l_i_Result = (Core_GetLoginStatus() = 1 And Core_GetInGameStatus() = 1)
+	Return $l_i_Result
+EndFunc
+
+Func Core_IsIngame()
+	Local $l_i_Result = (Core_GetLoginStatus() = 0 And Core_GetInGameStatus() = 1)
+	Return $l_i_Result
 EndFunc
 
 Func Core_GetStatusError()
